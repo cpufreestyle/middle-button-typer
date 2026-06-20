@@ -1,0 +1,17 @@
+# macOS 特定文件
+.DS_Store
+
+# 编译产物
+MiddleButtonTyper
+MiddleButtonTyperApp
+*.app/Contents/MacOS/MiddleButtonTyper
+
+# 日志
+*.log
+
+# 临时文件
+*.swp
+*~
+
+# cliclick 二进制（通过 brew 或手动安装，不提交）
+cliclick
