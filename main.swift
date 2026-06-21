@@ -44,9 +44,11 @@ func typeString(_ string: String) {
     }
 }
 
-// 全局状态，用于重置 tap
+// 全局状态
 var currentTap: CFMachPort? = nil
 var currentSource: CFRunLoopSource? = nil
+var retryTimer: Timer? = nil
+var isTapActive = false
 
 func teardownEventTap() {
     if let tap = currentTap {
@@ -57,6 +59,7 @@ func teardownEventTap() {
         currentTap = nil
         currentSource = nil
     }
+    isTapActive = false
 }
 
 func setupEventTap() -> Bool {
@@ -82,6 +85,7 @@ func setupEventTap() -> Bool {
             currentSource = source
             CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
             CGEvent.tapEnable(tap: tap, enable: true)
+            isTapActive = true
             log("鼠标中键监听已启动")
             return true
         } else {
@@ -90,24 +94,40 @@ func setupEventTap() -> Bool {
             return false
         }
     } else {
-        log("无法创建事件监听，请检查辅助功能权限")
+        log("无法创建事件监听，请检查辅助功能权限（5秒后会自动重试）")
         return false
     }
 }
 
+func startRetryTimerIfNeeded() {
+    guard retryTimer == nil || !retryTimer!.isValid else { return }
+
+    retryTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+        if !isTapActive {
+            log("自动重试创建事件监听...")
+            if setupEventTap() {
+                log("重试成功，事件监听已启动")
+            }
+        }
+    }
+}
+
 func mouseCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent, refcon: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
-    // 处理 tap 被系统超时禁用的事件
     if type == .tapDisabledByTimeout {
         log("事件监听被系统超时禁用，正在重新启用...")
         if let tap = currentTap {
             CGEvent.tapEnable(tap: tap, enable: true)
             log("事件监听已重新启用")
+        } else {
+            _ = setupEventTap()
         }
         return nil
     }
 
     if type == .tapDisabledByUserInput {
         log("事件监听被用户禁用（可能在「辅助功能」中取消了授权）")
+        isTapActive = false
+        startRetryTimerIfNeeded()
         return nil
     }
 
@@ -124,12 +144,16 @@ func mouseCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent, re
 
 func handleWake(_ notification: Notification) {
     log("系统唤醒，重新初始化事件监听...")
-    _ = setupEventTap()
+    if setupEventTap() {
+        log("唤醒后事件监听已启动")
+    } else {
+        startRetryTimerIfNeeded()
+    }
 }
 
 func handleSleep(_ notification: Notification) {
-    log("系统即将休眠，暂时禁用事件监听")
-    teardownEventTap()
+    log("系统即将休眠")
+    // 不再释放 tap，保留状态；唤醒时重新创建更稳
 }
 
 func registerSleepWakeHandlers() {
@@ -155,7 +179,11 @@ func registerSleepWakeHandlers() {
 
 // 启动
 log("程序启动")
-_ = setupEventTap()
+if setupEventTap() {
+    log("进入 RunLoop")
+} else {
+    startRetryTimerIfNeeded()
+    log("进入 RunLoop（等待辅助功能授权）")
+}
 registerSleepWakeHandlers()
-log("进入 RunLoop")
 RunLoop.main.run()
