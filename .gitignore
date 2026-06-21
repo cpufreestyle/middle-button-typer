@@ -4,7 +4,8 @@
 # 编译产物
 MiddleButtonTyper
 MiddleButtonTyperApp
-*.app/Contents/MacOS/MiddleButtonTyper
+MiddleButtonTyper.app/
+MiddleButtonTyper-*.zip
 
 # 日志
 *.log

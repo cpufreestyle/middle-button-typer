@@ -19,10 +19,6 @@
    系统设置 → 隐私与安全性 → 辅助功能 → 允许 `MiddleButtonTyper`
 4. 在文本输入框按鼠标中键 → 自动输入 `135790`
 
-### 开机自启 | Auto-Start
-
-系统设置 → 通用 → 登录项 → 点 **+** → 选择 `MiddleButtonTyper.app`
-
 ### 依赖 | Dependencies
 
 需要 [cliclick](https://github.com/BlueM/cliclick)（用于键盘事件注入）：
@@ -38,6 +34,56 @@ git clone https://github.com/BlueM/cliclick.git
 cd cliclick && make
 cp cliclick ~/bin/
 ```
+
+---
+
+## ⚙️ 开机自启（推荐双保险） | Auto-Start (Dual Method)
+
+macOS 上 Accessibility 权限是按「用户登录 session」授予的，所以 GUI 类工具最稳的启动方式是用 **Login Items**；再配一个 **launchd** 做守护，确保异常退出后自动重启。
+
+### 方法 A：Login Items（最稳，推荐）
+
+1. 打开 **系统设置 → 通用 → 登录项**
+2. 点 **+**，选择 `~/Applications/MiddleButtonTyper.app`
+3. 完成，每次登录都会自动启动
+
+### 方法 B：一键安装脚本（双保险）
+
+适合想自动化的用户，会同时做：
+
+- 复制 `MiddleButtonTyper.app` 到 `~/Applications`
+- 创建 launchd 启动项（异常退出 10 秒后自动重启）
+- 立即启动
+
+```bash
+cd middle-button-typer
+./install.sh
+```
+
+> 脚本首次运行后，**仍需要手动授权**：系统设置 → 隐私与安全性 → 辅助功能 → 允许 MiddleButtonTyper
+>
+> **注意**：launchd 启动的进程有时无法获得 Accessibility 权限，因此安装完成后仍建议按方法 A 再手动添加 Login Items。
+
+### 方法 C：手动 launchd（进阶）
+
+如果你不想用脚本，可以手动编辑 `com.cpufreestyle.middle-button-typer.plist`：
+
+1. 把 `CHANGE_ME` 改成你的用户名和实际路径
+2. 复制到 `~/Library/LaunchAgents/`
+3. 加载：
+
+```bash
+launchctl load ~/Library/LaunchAgents/com.cpufreestyle.middle-button-typer.plist
+launchctl start com.cpufreestyle.middle-button-typer
+```
+
+### 卸载
+
+```bash
+./uninstall.sh
+```
+
+> 这会删除 launchd 项和 `~/Applications/MiddleButtonTyper.app`，但 Login Items 里手动添加的条目仍需手动移除。
 
 ---
 
@@ -138,12 +184,15 @@ tail -f /tmp/middle_button_typer.log
 
 ```
 .
-├── main.swift                    # 主程序源码
-├── build.sh                      # 编译脚本
-├── install.sh                    # launchd 安装（备用）
-├── com.a1-6.middle-button-typer.plist  # launchd 配置
-├── MiddleButtonTyper.app/        # 已编译 .app
-├── README.md                     # 本文件
+├── main.swift                                    # 主程序源码
+├── build.sh                                      # 编译脚本
+├── install.sh                                    # 一键安装脚本（Login Items + launchd）
+├── uninstall.sh                                  # 卸载脚本
+├── com.a1-6.middle-button-typer.plist            # 旧 launchd 配置（不再使用）
+├── com.cpufreestyle.middle-button-typer.plist    # launchd 模板
+├── MiddleButtonTyper.app/                        # 已编译 .app（不提交到 git）
+├── MiddleButtonTyper-1.0.2.zip                   # 发布包（不提交到 git）
+├── README.md                                     # 本文件
 └── .gitignore
 ```
 
